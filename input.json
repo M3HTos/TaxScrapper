@@ -1,0 +1,10 @@
+{
+  "action": "Get taxes form info",
+  "args": {
+      "forms": [
+        "Form W-2",
+        "Form W-2AS",
+        "Form 211"
+      ]
+  }
+}
