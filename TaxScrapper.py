@@ -1,24 +1,25 @@
+import json
+from pathlib import Path
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-import json
-from pathlib import Path
 import requests
 
 
 class TaxScrapper:
     driver: webdriver.Chrome
     wait: WebDriverWait
+    MAIN_PAGE_URL = "https://apps.irs.gov/app/picklist/list/formsPublications.html"
 
     def init_driver(self):
         options = webdriver.ChromeOptions()
         options.headless = True
-        self.driver = webdriver.Chrome("./drivers/chromedriver.exe", options=options)
+        self.driver = webdriver.Chrome("binaries/chromedriver.exe", options=options)
         self.wait = WebDriverWait(self.driver, 10)
 
     def load_main(self):
-        self.driver.get("https://apps.irs.gov/app/picklist/list/formsPublications.html")
+        self.driver.get(self.MAIN_PAGE_URL)
         self.wait.until(EC.visibility_of_element_located((By.CLASS_NAME, "picklistTable")))
 
     @staticmethod
@@ -38,7 +39,7 @@ class TaxScrapper:
         self.load_main()
         for name in args["forms"]:
             print(f"Getting information about {name}")
-            years = []
+            years = set()
             self.driver.find_element_by_id("searchFor").clear()
             self.driver.find_element_by_id("searchFor").send_keys(name)
             self.driver.find_element_by_name("submitSearch").click()
@@ -54,10 +55,9 @@ class TaxScrapper:
                 title = tds[1].text
                 year_end = tds[2].text[-2:]
                 year = self.fix_year(year_end)
-                years.append(year)
-            years.sort()
-            min_year = years[0]
-            max_year = years[-1]
+                years.add(year)
+            min_year = min(years)
+            max_year = max(years)
             output.append(
                 {
                     "form_number": name,
@@ -76,7 +76,8 @@ class TaxScrapper:
         self.driver.find_element_by_name("submitSearch").click()
         self.wait.until(EC.url_changes)
         self.wait.until(EC.visibility_of_element_located((By.CLASS_NAME, "picklistTable")))
-        frm, to = [int(year) for year in args["range"].split("-")]
+        frm, to = args["range"].split("-")
+        frm, to = int(frm), int(to)
         elements = self.driver.find_elements_by_link_text(name)
         if not elements:
             print(F"Form \"{name}\" not found!")
@@ -110,8 +111,5 @@ if __name__ == '__main__':
         elif args["action"] == "Get taxes form info":
             print("Getting taxes forms info")
             ts.get_tax_forms(args["args"])
-    except Exception as e:
-        # Broad exception to make sure the driver turns off
-        print(e)
     finally:
         ts.driver.close()
